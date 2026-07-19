@@ -89,7 +89,7 @@ img{max-width:100%;display:block}
 .btn{display:inline-flex;align-items:center;gap:9px;font-family:'Space Grotesk';font-weight:500;font-size:.92rem;padding:12px 20px;border-radius:10px;border:1px solid transparent;cursor:pointer;transition:transform .15s,box-shadow .2s,background .2s,border-color .2s}
 .btn-primary{background:var(--cyan);color:#001210;box-shadow:0 8px 30px -8px var(--cyan-glow)}
 .btn-primary:hover{transform:translateY(-2px);box-shadow:0 14px 40px -10px var(--cyan-glow)}
-.btn-ghost{border-color:var(--line-strong);color:var(--ink)}
+.btn-ghost{background:transparent;border-color:var(--line-strong);color:var(--ink)}
 .btn-ghost:hover{border-color:var(--cyan);color:var(--cyan);transform:translateY(-2px)}
 .scroll-hint{position:absolute;bottom:26px;left:var(--sp);z-index:2;display:flex;align-items:center;gap:10px;font-family:ui-monospace,monospace;font-size:.66rem;letter-spacing:.2em;text-transform:uppercase;color:var(--faint)}
 .scroll-hint .bar{width:34px;height:1px;background:var(--faint);position:relative;overflow:hidden}
@@ -124,31 +124,117 @@ section[id]{scroll-margin-top:20px}
 
 /* ============ WORK GRID ============ */
 .work-intro{color:var(--dim);font-size:1.02rem;max-width:62ch;margin-bottom:36px;margin-top:-16px}
-.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:clamp(18px,2.4vw,30px)}
-.card{display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:16px;overflow:hidden;transition:transform .25s ease,border-color .25s,box-shadow .25s;opacity:0;transform:translateY(26px)}
-.card.in{opacity:1;transform:none;transition:transform .6s ease,opacity .6s ease,border-color .25s,box-shadow .25s}
-.card.in{transition-delay:calc(var(--i,0) * 60ms)}
-@media (prefers-reduced-motion: reduce){.card{opacity:1;transform:none}}
-.card:hover{transform:translateY(-5px);border-color:var(--cyan);box-shadow:var(--card-shadow)}
-.card-img{aspect-ratio:16/10;overflow:hidden;background:var(--panel-2);position:relative}
-.card-img img{width:100%;height:100%;object-fit:cover;transition:transform .5s ease;filter:saturate(1.02)}
-.card:hover .card-img img{transform:scale(1.05)}
-/* animated cover video plays over the static poster (looping, muted) */
-.card-vid{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:1}
-.card.has-vid .card-img img{opacity:0}
-@media (prefers-reduced-motion:reduce){.card-vid{display:none}.card.has-vid .card-img img{opacity:1}}
-.card-img::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 55%,rgba(7,11,20,.35));opacity:0;transition:opacity .3s}
-:root[data-theme="light"] .card-img::after{background:linear-gradient(180deg,transparent 55%,rgba(12,60,58,.12))}
-.card:hover .card-img::after{opacity:1}
-.card-body{padding:22px 22px 24px;display:flex;flex-direction:column;flex:1}
-.card-meta{display:flex;align-items:center;gap:12px;margin-bottom:11px}
-.card-meta .pid{font-family:ui-monospace,monospace;font-size:.7rem;color:var(--cyan);letter-spacing:.08em}
-.card-meta .kick{font-family:ui-monospace,monospace;font-size:.66rem;letter-spacing:.18em;text-transform:uppercase;color:var(--faint)}
-.card h3{font-size:1.4rem;line-height:1.08;margin-bottom:9px}
-.card p{color:var(--ink-2);font-size:.94rem;line-height:1.5;flex:1}
-.card-cta{margin-top:16px;display:inline-flex;align-items:center;gap:8px;font-family:'Space Grotesk';font-weight:500;font-size:.86rem;color:var(--cyan)}
-.card-cta svg{transition:transform .25s}
-.card:hover .card-cta svg{transform:translateX(4px)}
+
+/* ===== EXHIBIT — projects as floating architectural artifacts in space =====
+   No orbits, no core. Framed artifacts drift weightlessly at varied depths; the
+   whole field slowly pans (camera drift, JS sets --camx/--camy). Thin glowing links
+   appear only on hover (drawn on the canvas). A museum exhibit in space. */
+/* FULL-BLEED: the exhibit fills the whole viewport; header + nav float over it. */
+.section-exhibit .main{height:100svh;overflow:hidden;position:relative}
+.exhibit-page{position:absolute;inset:0}
+.exhibit{position:absolute;inset:0;z-index:0;overflow:hidden;isolation:isolate;
+  background:radial-gradient(130% 130% at 50% 42%,#06171d 0%,#04121a 52%,#02090f 100%)}
+:root[data-theme="light"] .exhibit{background:radial-gradient(130% 130% at 50% 42%,#dcefe9 0%,#eaf4f1 55%,#f2f8f6 100%)}
+.exhibit-canvas{position:absolute;inset:0;width:100%;height:100%;z-index:0;display:block}
+/* floating header (top-left) + nav (bottom), over the artifact field */
+.exhibit-head{position:absolute;top:clamp(20px,4vh,40px);left:0;right:0;z-index:6;pointer-events:none}
+.exhibit-head .crumb{pointer-events:auto;margin-bottom:16px}
+.exhibit-head .sh-num{font-family:ui-monospace,monospace;font-size:.8rem;letter-spacing:.24em;color:var(--star-hue,var(--cyan));margin-bottom:8px}
+.exhibit-head h1{font-size:clamp(1.9rem,5vw,3.4rem);line-height:.98;margin-bottom:10px;text-shadow:0 2px 30px rgba(0,0,0,.7)}
+.exhibit-head .sh-blurb{color:var(--dim);font-size:1rem;max-width:52ch}
+.exhibit-nav{position:absolute!important;bottom:clamp(16px,3vh,32px);left:var(--sp);right:var(--sp);z-index:7;
+  margin:0!important;padding-top:0!important;border-top:0!important}
+.exhibit-nav a,.exhibit-nav .pn-home{background:color-mix(in srgb,var(--void) 60%,transparent);backdrop-filter:blur(8px);
+  border:1px solid var(--line-strong);border-radius:12px;padding:9px 15px}
+.exhibit-nav .pn-l{display:inline-block}
+/* the stage carries the slow camera drift; artifacts sit inside it in % space */
+.exhibit-stage{position:absolute;inset:0;z-index:2;transform:translate(var(--camx,0px),var(--camy,0px));
+  transition:transform .3s linear}
+
+.artifact{position:absolute;left:calc(var(--ax)*1%);top:calc(var(--ay)*1%);z-index:2;
+  /* near artifacts (ad→0) larger & more foreground; far (ad→1) smaller & dimmer */
+  --scale:calc(1.08 - var(--ad)*0.42);
+  transform:translate(-50%,-50%) translate(var(--fx,0px),var(--fy,0px)) scale(var(--scale));
+  width:clamp(150px,18vw,232px);display:block;outline:none;
+  opacity:calc(1 - var(--ad)*0.32);will-change:transform;
+  transition:opacity .4s}
+.art-frame{position:relative;display:block;border-radius:14px;overflow:hidden;
+  border:1px solid var(--line-strong);background:var(--panel-2);
+  box-shadow:0 24px 60px -26px rgba(0,0,0,.85);
+  transition:transform .4s cubic-bezier(.2,.8,.25,1),border-color .4s,box-shadow .4s}
+.art-img{position:relative;display:block;aspect-ratio:4/3;overflow:hidden}
+.art-img img{width:100%;height:100%;object-fit:cover;opacity:.9;transition:opacity .4s,transform .6s;filter:saturate(1.04)}
+.art-img::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 55%,rgba(2,9,15,.6));opacity:.6;transition:opacity .4s}
+:root[data-theme="light"] .art-img::after{background:linear-gradient(180deg,transparent 60%,rgba(12,60,58,.14))}
+/* plaque = museum label under the piece */
+.art-plaque{display:block;padding:10px 12px 12px;background:color-mix(in srgb,var(--panel) 82%,transparent);backdrop-filter:blur(6px)}
+.art-id{font-family:ui-monospace,monospace;font-size:.58rem;letter-spacing:.16em;color:var(--star-hue,var(--cyan));display:block}
+.art-name{font-family:'Space Grotesk';font-weight:700;font-size:.98rem;line-height:1.06;color:var(--ink);display:block;margin-top:2px}
+.art-kick{font-family:ui-monospace,monospace;font-size:.56rem;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);display:block;margin-top:3px;
+  max-height:0;opacity:0;overflow:hidden;transition:max-height .3s,opacity .3s,margin .3s}
+
+/* hover/focus = the piece lifts forward, lights its frame, reveals the kicker; JS
+   adds .lit and draws its connection lines on the canvas. */
+.artifact:hover,.artifact:focus-visible,.artifact.lit{z-index:6}
+.artifact:hover .art-frame,.artifact:focus-visible .art-frame,.artifact.lit .art-frame{
+  transform:translateY(-6px) scale(1.06);border-color:var(--star-hue,var(--cyan));
+  box-shadow:0 40px 90px -30px rgba(0,0,0,.9),0 0 0 1px var(--star-hue,var(--cyan)),0 0 60px -14px var(--star-hue,var(--cyan))}
+.artifact:hover .art-img img,.artifact.lit .art-img img{opacity:1;transform:scale(1.05)}
+.artifact:hover .art-img::after,.artifact.lit .art-img::after{opacity:.35}
+.artifact:hover .art-kick,.artifact:focus-visible .art-kick,.artifact.lit .art-kick{max-height:20px;opacity:1;margin-top:3px}
+/* KIN: projects that share tools with the hovered one glow softly (JS adds .kin) */
+.artifact.kin{z-index:5}
+.artifact.kin .art-frame{border-color:color-mix(in srgb,var(--star-hue,var(--cyan)) 60%,transparent);
+  box-shadow:0 28px 70px -30px rgba(0,0,0,.85),0 0 34px -12px var(--star-hue,var(--cyan))}
+.artifact.kin .art-img img{opacity:1}
+/* non-kin, non-lit pieces dim slightly so the relationship reads clearly */
+.exhibit:has(.artifact.lit) .artifact:not(.lit):not(.kin){opacity:.4;transition:opacity .35s}
+
+/* connection labels: a small pill riding the MIDPOINT of each link line, naming the
+   shared method. Solid backing + sits above the cards → never overlaps plaque text. */
+.conn-labels{position:absolute;inset:0;z-index:8;pointer-events:none}
+.conn-chip{position:absolute;transform:translate(-50%,-50%) scale(.9);
+  font-family:ui-monospace,monospace;font-size:.56rem;letter-spacing:.14em;text-transform:uppercase;
+  white-space:nowrap;padding:4px 8px;border-radius:999px;
+  color:var(--ink);background:color-mix(in srgb,var(--void) 88%,transparent);
+  border:1px solid color-mix(in srgb,var(--star-hue,var(--cyan)) 55%,transparent);
+  box-shadow:0 2px 14px -4px rgba(0,0,0,.8),0 0 18px -8px var(--star-hue,var(--cyan));
+  backdrop-filter:blur(3px);
+  opacity:0;visibility:hidden;transition:opacity .25s ease,transform .25s ease}
+.conn-chip.on{opacity:1;visibility:visible;transform:translate(-50%,-50%) scale(1)}
+
+.exhibit-hint{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);z-index:5;
+  font-family:ui-monospace,monospace;font-size:.62rem;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--faint);opacity:.7;pointer-events:none;white-space:nowrap;
+  animation:hintPulse 3.4s ease-in-out infinite}
+
+/* click → the field drifts toward the chosen piece before navigating */
+.exhibit.warp .exhibit-canvas{transition:opacity .5s;opacity:0}
+.exhibit.warp .artifact:not(.chosen){opacity:0;transition:opacity .35s}
+.exhibit.warp .chosen .art-frame{transition:transform .55s ease-in,box-shadow .55s;transform:scale(1.4);box-shadow:0 0 120px -10px var(--star-hue,var(--cyan))}
+
+@media (prefers-reduced-motion: reduce){
+  .exhibit-stage,.artifact,.art-frame,.art-img img,.exhibit-hint{transition:none;animation:none}
+}
+@media (max-width:1000px){
+  /* mobile: drop full-bleed, return to normal scrolling document with stacked cards */
+  .section-exhibit .main{height:auto;overflow:visible;position:static}
+  .exhibit-page{position:static}
+  .exhibit{position:relative;inset:auto;background:none;overflow:visible;padding:0}
+  .exhibit-canvas,.exhibit-hint{display:none}
+  .exhibit-head{position:static;pointer-events:auto;padding-top:clamp(40px,8vh,80px);padding-bottom:24px}
+  .exhibit-head h1{text-shadow:none}
+  .exhibit-nav{position:static!important;margin-top:32px!important;padding-top:24px!important;border-top:1px solid var(--line)!important}
+  .exhibit-nav a,.exhibit-nav .pn-home{background:none;backdrop-filter:none;border:0;padding:0}
+  .exhibit-nav .pn-home{border:1px solid var(--line-strong);padding:9px 15px}
+  /* stack the artifacts into a clean 1-col list */
+  .exhibit-stage{position:static;transform:none;display:flex;flex-direction:column;gap:16px}
+  .artifact{position:static;transform:none!important;width:100%;opacity:1!important;--scale:1}
+  .art-frame{transform:none!important}
+  .art-img{aspect-ratio:16/9}
+  .art-kick{max-height:20px;opacity:1;margin-top:3px}
+}
+
 .further{margin-top:40px;color:var(--dim);font-size:.95rem;line-height:1.6}
 .further a{color:var(--cyan);border-bottom:1px solid var(--cyan-glow)}
 
@@ -565,24 +651,53 @@ body.paged .main{height:100svh;overflow:hidden;position:relative}
 /* hero next button */
 .hero-inner .next-btn{margin-top:38px}
 
-/* ============ SECTION CARDS (home) ============ */
-.section-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:clamp(16px,2.2vw,24px)}
-.section-card{position:relative;border:1px solid var(--line);border-radius:18px;overflow:hidden;min-height:230px;display:flex;align-items:flex-end;transition:transform .25s,border-color .25s,box-shadow .25s;background:var(--panel-2)}
-.section-card:hover{transform:translateY(-4px);border-color:var(--cyan);box-shadow:var(--card-shadow)}
-.section-card .sc-media{position:absolute;inset:0;z-index:0;overflow:hidden}
-.section-card .sc-media img{width:100%;height:100%;object-fit:cover;opacity:.8;transition:opacity .4s,transform .6s;filter:saturate(1.08)}
-.section-card:hover .sc-media img{opacity:.98;transform:scale(1.05)}
-.section-card::after{content:"";position:absolute;inset:0;z-index:1;background:linear-gradient(180deg,rgba(7,11,20,.15) 0%,rgba(7,11,20,.35) 45%,rgba(7,11,20,.9) 100%)}
-:root[data-theme="light"] .section-card::after{background:linear-gradient(180deg,rgba(238,241,247,.1) 0%,rgba(238,241,247,.4) 45%,rgba(238,241,247,.95) 100%)}
-.section-card.empty .sc-media{opacity:.1}
-.section-card.empty::after{background:linear-gradient(180deg,var(--panel),var(--panel-2))}
-.sc-body{position:relative;z-index:2}
-.sc-body{padding:24px 24px 22px;width:100%}
-.sc-num{font-family:ui-monospace,monospace;font-size:.75rem;letter-spacing:.2em;color:var(--cyan)}
-.section-card h3{font-size:clamp(1.35rem,2.4vw,1.9rem);line-height:1.02;margin:8px 0 8px}
-.section-card p{color:var(--ink-2);font-size:.92rem;line-height:1.45;max-width:44ch}
-.sc-count{display:inline-flex;align-items:center;gap:8px;margin-top:14px;font-family:'Space Grotesk';font-weight:500;font-size:.85rem;color:var(--cyan)}
-.section-card.empty .sc-count{color:var(--faint)}
+/* ============ GALAXY MAP CHOOSER (home) ============ */
+/* The galaxy fills the ENTIRE work page (full-bleed) — canvas + stars span the whole
+   middle screen behind the floating heading + nav. Drawn on one <canvas> by the
+   `galaxyMap` module; .star-node <a>s sit on top, positioned over each sun. */
+.page-galaxy{padding:0!important;overflow:hidden}
+.galaxy{position:absolute;inset:0;z-index:0;overflow:hidden;
+  background:radial-gradient(130% 120% at 42% 38%,#071a20 0%,#04121a 46%,#020a10 100%)}
+:root[data-theme="light"] .page-galaxy{background:transparent}
+:root[data-theme="light"] .galaxy{background:radial-gradient(130% 120% at 42% 38%,#dcefe9 0%,#eaf4f1 55%,#f2f8f6 100%)}
+.galaxy-canvas{position:absolute;inset:0;width:100%;height:100%;z-index:0;display:block}
+/* heading floats over the top of the galaxy; nav floats at the bottom */
+.page-galaxy .galaxy-head{position:absolute;top:8vh;left:0;right:0;z-index:4;pointer-events:none}
+.page-galaxy .galaxy-head .page-head{margin-bottom:0}
+.page-galaxy .page-head h2{text-shadow:0 2px 30px rgba(0,0,0,.7)}
+.page-galaxy .page-nav{position:absolute;bottom:3vh;left:var(--sp);right:var(--sp);z-index:5;padding-top:0}
+/* nav sits over the live galaxy → give buttons a readable backdrop in both themes */
+.page-galaxy .page-nav .btn-ghost,.page-galaxy .page-nav .pn-dot-btn{
+  background:color-mix(in srgb,var(--void) 62%,transparent);backdrop-filter:blur(8px);
+  border:1px solid var(--line-strong);border-radius:12px;padding:10px 16px}
+.page-galaxy .page-nav .pn-dot-btn{color:var(--ink)}
+.page-galaxy .page-nav .btn-ghost:hover,.page-galaxy .page-nav .pn-dot-btn:hover{border-color:var(--cyan);color:var(--cyan)}
+.galaxy-hint{position:absolute;left:50%;bottom:8vh;transform:translateX(-50%);z-index:3;
+  font-family:ui-monospace,monospace;font-size:.64rem;letter-spacing:.26em;text-transform:uppercase;
+  color:var(--faint);opacity:.7;pointer-events:none;white-space:nowrap;animation:hintPulse 3.4s ease-in-out infinite}
+@keyframes hintPulse{50%{opacity:.32}}
+
+/* each system = an <a> centred on its sun's % coordinate */
+.star-node{position:absolute;transform:translate(-50%,-50%);z-index:2;display:block;
+  text-align:center;outline:none;-webkit-tap-highlight-color:transparent}
+.star-hit{display:block;width:clamp(92px,12vw,132px);height:clamp(92px,12vw,132px);
+  border-radius:50%;margin:0 auto;cursor:pointer}
+.star-label{position:absolute;left:50%;top:100%;transform:translate(-50%,6px);width:max-content;
+  pointer-events:none;transition:transform .3s cubic-bezier(.2,.8,.25,1)}
+.star-num{font-family:ui-monospace,monospace;font-size:.64rem;letter-spacing:.24em;color:var(--star-hue,var(--cyan));display:block;opacity:.85}
+.star-title{font-family:'Space Grotesk';font-weight:700;font-size:clamp(1rem,1.6vw,1.4rem);line-height:1.02;
+  color:var(--ink);display:block;margin-top:3px;text-shadow:0 2px 18px rgba(0,0,0,.6)}
+.star-meta{font-family:'Space Grotesk';font-weight:500;font-size:.78rem;color:var(--star-hue,var(--cyan));display:block;margin-top:4px}
+.star-node.empty .star-meta{color:var(--faint)}
+/* label lifts + number brightens when the system ignites (JS toggles .live) */
+.star-node.live .star-label{transform:translate(-50%,10px)}
+.star-node.live .star-title{text-shadow:0 2px 24px var(--star-hue)}
+.star-node:focus-visible .star-hit{box-shadow:0 0 0 2px var(--star-hue,var(--cyan)),0 0 22px var(--star-hue,var(--cyan))}
+
+@media (prefers-reduced-motion: reduce){
+  .galaxy-hint{animation:none}
+  .star-label{transition:none}
+}
 
 /* profile + skills on home */
 .skills-col{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-content:start}
@@ -614,7 +729,10 @@ body.paged .main{height:100svh;overflow:hidden;position:relative}
 
 /* ============ RESPONSIVE ============ */
 @media (max-width:1000px){
-  .section-grid{grid-template-columns:1fr}
+  /* galaxy is full-bleed (position:absolute inset:0) at every size now */
+  .star-title{font-size:1rem}
+  .galaxy-hint{font-size:.56rem;letter-spacing:.16em}
+  .page-galaxy .galaxy-head{top:6vh}
   .edu-contact{grid-template-columns:1fr}
   .about-grid,.proj-grid,.contact-grid{grid-template-columns:1fr}
   .proj-side{position:static}

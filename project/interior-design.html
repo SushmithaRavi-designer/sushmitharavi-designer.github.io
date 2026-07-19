@@ -13,9 +13,9 @@
   <div>
     <a class="brand" href="../index.html">Sushmitha<br>Ravi<small>Architect &amp; Computational Designer</small></a>
     <nav id="nav"><a href="../index.html"><span class="idx">←</span> Home</a>
-<a href="../section/bachelors.html"><span class="idx">01</span> Bachelor’s Work</a>
-<a href="../section/professional.html"><span class="idx">02</span> Professional Work</a>
-<a href="../section/masters.html"><span class="idx">03</span> Master’s Work</a>
+<a href="../section/masters.html"><span class="idx">01</span> Master’s Work</a>
+<a href="../section/bachelors.html"><span class="idx">02</span> Bachelor’s Work</a>
+<a href="../section/professional.html"><span class="idx">03</span> Professional Work</a>
 <a href="../section/freelance.html"><span class="idx">04</span> Freelance</a>
 <a href="../index.html#contact"><span class="idx">✎</span> Contact</a></nav>
   </div>
@@ -40,7 +40,7 @@
       <div class="proj-hero-grad"></div>
       <div class="wrap proj-hero-inner">
         <a class="crumb" href="../section/professional.html"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M19 12H5M11 6l-6 6 6 6"/></svg> Professional Work</a>
-        <div class="proj-tagline"><span class="pid">02.03</span> Practice · Gaming zone &amp; bowling alley</div>
+        <div class="proj-tagline"><span class="pid">03.03</span> Practice · Gaming zone &amp; bowling alley</div>
         <h1>Interior</h1>
         <!-- p.team ("Team of 5" / "Individual" / …) is deliberately NOT shown — the
              role pill below already says what she did. It stays in content.mjs. -->
@@ -104,12 +104,157 @@
   ['top','about','work','education','contact'].forEach(id=>{const el=document.getElementById(id);if(el)obs.observe(el)});
 })();
 
-/* ===== CARD REVEAL ===== */
+/* ===== EXHIBIT — floating architectural artifacts (section page) =====
+   Projects float weightlessly at varied depths; the whole field slowly pans (camera
+   drift). Each artifact bobs gently around its anchor. Thin glowing links appear
+   ONLY when an artifact is hovered, connecting it to its 2 nearest neighbours (drawn
+   on the canvas + a soft starfield/vignette). A museum exhibit in space. No deps.
+   Reduced-motion / mobile → static stacked list (CSS), this module no-ops there. */
 (function(){
-  const cards=document.querySelectorAll('.card');if(!cards.length)return;
-  if(matchMedia('(prefers-reduced-motion: reduce)').matches){cards.forEach(c=>c.classList.add('in'));return;}
-  const io=new IntersectionObserver((es)=>{es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}})},{rootMargin:'0px 0px -10% 0px'});
-  cards.forEach(c=>io.observe(c));
+  const root=document.getElementById('exhibit');if(!root)return;
+  const stage=root.querySelector('.exhibit-stage');
+  const cv=root.querySelector('.exhibit-canvas');
+  const ctx=cv.getContext('2d');
+  const arts=[...root.querySelectorAll('.artifact')];
+  const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const mobile=matchMedia('(max-width:1000px)').matches;
+  if(reduce||mobile||!arts.length)return;               // CSS handles the static/stacked view
+  const hue=root.dataset.hue||'#2ee6c8';
+  const rgb=(h=>{const n=parseInt(h.slice(1),16);return[n>>16&255,n>>8&255,n&255];})(hue);
+  let W=1,H=1,DPR=1,raf,t=0,running=true;
+
+  // per-artifact float params (bob gently around the CSS anchor) + parsed anchor%/depth
+  const items=arts.map((el,i)=>{
+    const ax=parseFloat(el.style.getPropertyValue('--ax'))||50;
+    const ay=parseFloat(el.style.getPropertyValue('--ay'))||50;
+    const ad=parseFloat(el.style.getPropertyValue('--ad'))||0;
+    const seed=parseFloat(el.style.getPropertyValue('--seed'))||i*13;
+    // THEMATIC kin: indices of projects that share tools/methods (from data-links)
+    const links=(el.dataset.links||'').split(',').map(s=>parseInt(s,10)).filter(n=>!isNaN(n));
+    // short method label (the kicker under the name) → shown on the connection line
+    const kick=(el.querySelector('.art-kick')?.textContent||'').trim();
+    return {el,i,ax,ay,ad,seed,links,kick,
+      amp:8+ (1-ad)*10,                    // near pieces bob a touch more
+      sp:0.25+Math.random()*0.2};
+  });
+
+  // ---- HTML chips that ride the MIDPOINT of each connection line -----------------
+  // We label lines with real HTML (not canvas) so the text stays crisp AND sits on a
+  // solid pill ABOVE the cards — it can never blend into or overlap a plaque's text.
+  const chipLayer=document.createElement('div');
+  chipLayer.className='conn-labels';chipLayer.setAttribute('aria-hidden','true');
+  // append INTO the stage so chips inherit the same camera-drift transform as the cards
+  stage.appendChild(chipLayer);
+  // pool of reusable chips (at most one per link the busiest node has)
+  const maxLinks=Math.max(1,...items.map(o=>o.links.length));
+  const chips=Array.from({length:maxLinks},()=>{
+    const c=document.createElement('span');c.className='conn-chip';chipLayer.appendChild(c);return c;
+  });
+
+  function resize(){DPR=Math.min(devicePixelRatio||1,2);const r=root.getBoundingClientRect();W=r.width;H=r.height;
+    cv.width=W*DPR;cv.height=H*DPR;ctx.setTransform(DPR,0,0,DPR,0,0);buildField();}
+  let field=[];
+  function buildField(){field=[];const n=Math.round(W*H/8500);
+    for(let k=0;k<n;k++){const d=Math.random();field.push({x:Math.random()*W,y:Math.random()*H,z:.3+d*.7,r:.4+d*1.2,tw:Math.random()*6.28,tws:.5+Math.random()*1.4});}}
+
+  // pixel centre of an artifact (anchor% + its float offset + camera drift)
+  let cam={x:0,y:0};
+  function centre(it){
+    return {x:(it.ax/100)*W + it.fx + cam.x, y:(it.ay/100)*H + it.fy + cam.y};
+  }
+  // same point but WITHOUT camera drift — for HTML chips that live inside the stage,
+  // which already carries the camera transform via CSS (so cam would be double-applied).
+  function centreNoCam(it){
+    return {x:(it.ax/100)*W + it.fx, y:(it.ay/100)*H + it.fy};
+  }
+
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    const light=document.documentElement.getAttribute('data-theme')==='light';
+    // soft vignette bloom
+    ctx.globalCompositeOperation='lighter';
+    const g=ctx.createRadialGradient(W/2,H*0.42,0,W/2,H*0.42,Math.max(W,H)*0.7);
+    g.addColorStop(0,`rgba(${rgb[0]},${rgb[1]},${rgb[2]},${light?0.05:0.09})`);
+    g.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+    ctx.globalCompositeOperation='source-over';
+    // starfield (drifts opposite the camera → depth)
+    for(const f of field){const ox=-cam.x*0.15*f.z, oy=-cam.y*0.15*f.z;
+      const tw=.55+.45*Math.sin(t*f.tws+f.tw);
+      ctx.globalAlpha=(light?.45:.8)*tw*f.z;ctx.fillStyle=light?'#4a6b64':'#bfe8e2';
+      ctx.beginPath();ctx.arc(((f.x+ox)%W+W)%W,((f.y+oy)%H+H)%H,f.r,0,7);ctx.fill();}
+    ctx.globalAlpha=1;
+
+    // hover connections: link the lit artifact to its THEMATIC KIN (projects that
+    // share tools/methods) — meaningful edges, not screen proximity. Kin also glow.
+    const lit=items.find(it=>it.el.classList.contains('lit'));
+    // clear any prior kin highlight, then re-apply for the current lit piece
+    items.forEach(o=>o.el.classList.toggle('kin', !!(lit && lit.links.includes(o.i))));
+    let chipUsed=0;
+    if(lit){
+      const a=centre(lit);
+      const aN=centreNoCam(lit);
+      ctx.globalCompositeOperation='lighter';
+      lit.links.forEach((j,k)=>{
+        const o=items[j]; if(!o)return;
+        const c=centre(o);
+        ctx.strokeStyle=`rgba(${rgb[0]},${rgb[1]},${rgb[2]},.5)`;
+        ctx.lineWidth=1.2;ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(c.x,c.y);ctx.stroke();
+        // travelling data pulse along the link
+        const tt=(t*0.5+k*0.4)%1;
+        const px=a.x+(c.x-a.x)*tt, py=a.y+(c.y-a.y)*tt;
+        ctx.fillStyle=`rgba(${rgb[0]},${rgb[1]},${rgb[2]},.95)`;
+        ctx.beginPath();ctx.arc(px,py,2.2,0,7);ctx.fill();
+        // label the line at its MIDPOINT with the kin's shared method (crisp HTML chip,
+        // solid pill above the cards → never overlaps/blends with any plaque text)
+        const cN=centreNoCam(o);
+        const chip=chips[chipUsed++];
+        if(chip && o.kick){
+          chip.textContent=o.kick;
+          chip.style.left=((aN.x+cN.x)/2)+'px';
+          chip.style.top =((aN.y+cN.y)/2)+'px';
+          chip.classList.add('on');
+        }
+      });
+      // soft aura at the lit piece
+      const au=ctx.createRadialGradient(a.x,a.y,0,a.x,a.y,120);
+      au.addColorStop(0,`rgba(${rgb[0]},${rgb[1]},${rgb[2]},.18)`);au.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle=au;ctx.beginPath();ctx.arc(a.x,a.y,120,0,7);ctx.fill();
+      ctx.globalCompositeOperation='source-over';
+    }
+    // hide any chips not used this frame (nothing lit, or fewer links than the pool)
+    for(let k=chipUsed;k<chips.length;k++)chips[k].classList.remove('on');
+  }
+
+  function frame(now){
+    t=(now||0)/1000;
+    // slow circular camera drift
+    cam.x=Math.sin(t*0.08)*W*0.02; cam.y=Math.cos(t*0.06)*H*0.02;
+    stage.style.setProperty('--camx',cam.x.toFixed(1)+'px');
+    stage.style.setProperty('--camy',cam.y.toFixed(1)+'px');
+    // each artifact bobs around its anchor
+    for(const it of items){
+      it.fx=Math.sin(t*it.sp+it.seed)*it.amp;
+      it.fy=Math.cos(t*it.sp*0.9+it.seed*1.3)*it.amp;
+      it.el.style.setProperty('--fx',it.fx.toFixed(1)+'px');
+      it.el.style.setProperty('--fy',it.fy.toFixed(1)+'px');
+    }
+    draw();
+    if(running)raf=requestAnimationFrame(frame);
+  }
+
+  arts.forEach(el=>{
+    const on=()=>el.classList.add('lit'), off=()=>el.classList.remove('lit');
+    el.addEventListener('pointerenter',on);el.addEventListener('pointerleave',off);
+    el.addEventListener('focus',on);el.addEventListener('blur',off);
+    el.addEventListener('click',ev=>{
+      ev.preventDefault();el.classList.add('chosen');root.classList.add('warp');
+      setTimeout(()=>{location.href=el.getAttribute('href');},560);
+    });
+  });
+  window.addEventListener('resize',()=>{clearTimeout(cv._t);cv._t=setTimeout(resize,150);});
+  document.addEventListener('visibilitychange',()=>{running=!document.hidden;if(running){raf=requestAnimationFrame(frame);}else cancelAnimationFrame(raf);});
+  resize();raf=requestAnimationFrame(frame);
 })();
 
 /* ===== ANIMATED COVER VIDEOS ON GRID CARDS ===== */
@@ -350,6 +495,211 @@
   // start on the hash's page if there is one (e.g. index.html#contact), else page 0
   go(0);
   fromHash();
+})();
+
+
+/* ===== GALAXY MAP CHOOSER (home "The Work" page) =====
+   Each chapter = a star SYSTEM: a glowing sun + orbiting "project planets", set in
+   a parallax starfield with drifting nebulae. Hovering a system IGNITES it (corona
+   flares, orbits speed up, halo blooms); clicking warps toward it then navigates.
+   Pure Canvas 2D — zero dependencies, offline-safe. Falls back to a static labelled
+   constellation under prefers-reduced-motion. */
+(function(){
+  const root=document.getElementById('galaxy');if(!root)return;
+  const cv=root.querySelector('.galaxy-canvas');
+  const ctx=cv.getContext('2d');
+  const starEls=[...root.querySelectorAll('.star-node')];
+  const meta=JSON.parse(root.dataset.stars||'[]');    // [{x,y,hue,r}] in %
+  const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let W=1,H=1,DPR=1,raf,running=true,t=0;
+  const mouse={x:-1,y:-1,in:false};
+  const hexToRgb=h=>{const n=parseInt(h.slice(1),16);return [n>>16&255,n>>8&255,n&255];};
+
+  // ---- build the systems from the DOM/meta ----
+  const systems=meta.map((m,i)=>{
+    const el=starEls[i];
+    const count=+(el?.dataset.count||0);
+    const rgb=hexToRgb(m.hue);
+    // planets = up to 6 orbiting dots, one per (sampled) project
+    const nP=Math.max(count?2:0,Math.min(6,count));
+    const planets=[];
+    for(let k=0;k<nP;k++){
+      planets.push({
+        orbit:1+k,                       // ring index
+        a:Math.random()*Math.PI*2,       // angle
+        speed:(0.12+Math.random()*0.10)/(1+k*0.5)*(k%2?-1:1),
+        pr:1.4+Math.random()*1.6         // planet radius (px, scaled later)
+      });
+    }
+    return {i,el,count,hue:m.hue,rgb,baseR:m.r||1,
+      x:0,y:0,live:0,             // live = 0..1 ignition amount (eased)
+      seed:Math.random()*99, planets};
+  });
+
+  // ---- starfield: 3 parallax depth layers of background stars + dust ----
+  let field=[];
+  function buildField(){
+    field=[];
+    const n=Math.round(W*H/9000);
+    for(let i=0;i<n;i++){
+      const depth=Math.random();                 // 0 far … 1 near
+      field.push({x:Math.random()*W,y:Math.random()*H,
+        z:0.3+depth*0.7, r:(0.4+depth*1.3),
+        tw:Math.random()*Math.PI*2, tws:0.5+Math.random()*1.5});
+    }
+  }
+  function place(){ // pixel positions of suns from % meta
+    for(const s of systems){s.x=meta[s.i].x/100*W; s.y=meta[s.i].y/100*H;}
+  }
+  function resize(){
+    DPR=Math.min(devicePixelRatio||1,2);
+    const r=root.getBoundingClientRect();W=r.width;H=r.height;
+    cv.width=W*DPR;cv.height=H*DPR;ctx.setTransform(DPR,0,0,DPR,0,0);
+    buildField();place();
+    // position the <a> hit-targets exactly over each sun (they already use % via CSS,
+    // so nothing to do here — but keep sun radius in px for drawing)
+  }
+
+  const sunR=s=>Math.max(14,Math.min(W,H)*0.055)*s.baseR;      // base sun radius px
+  const ringGap=s=>sunR(s)*0.95;
+
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    const light=document.documentElement.getAttribute('data-theme')==='light';
+    // parallax offset from cursor (subtle)
+    const px=mouse.in?(mouse.x-W/2)/W:0, py=mouse.in?(mouse.y-H/2)/H:0;
+
+    // ---- nebulae: soft radial blooms behind each system (screen blend) ----
+    ctx.globalCompositeOperation='lighter';
+    for(const s of systems){
+      const g=ctx.createRadialGradient(s.x,s.y,0,s.x,s.y,sunR(s)*(5+s.live*2.5));
+      const a=(light?0.10:0.16)+s.live*0.16;
+      g.addColorStop(0,`rgba(${s.rgb[0]},${s.rgb[1]},${s.rgb[2]},${a})`);
+      g.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle=g;ctx.beginPath();ctx.arc(s.x,s.y,sunR(s)*(5+s.live*2.5),0,7);ctx.fill();
+    }
+    ctx.globalCompositeOperation='source-over';
+
+    // ---- background starfield (parallax + twinkle) ----
+    for(const f of field){
+      const ox=px*40*f.z, oy=py*40*f.z;
+      const tw=reduce?1:(0.55+0.45*Math.sin(t*f.tws+f.tw));
+      ctx.globalAlpha=(light?0.5:0.85)*tw*f.z;
+      ctx.fillStyle=light?'#4a6b64':'#bfe8e2';
+      ctx.beginPath();ctx.arc(f.x+ox,f.y+oy,f.r,0,7);ctx.fill();
+    }
+    ctx.globalAlpha=1;
+
+    // ---- faint connective constellation lines between the suns ----
+    ctx.strokeStyle=light?'rgba(12,120,108,.14)':'rgba(120,200,196,.14)';
+    ctx.lineWidth=1;
+    const E=[[0,1],[0,2],[1,3],[2,3],[0,3]];
+    for(const [a,b] of E){ctx.beginPath();ctx.moveTo(systems[a].x,systems[a].y);ctx.lineTo(systems[b].x,systems[b].y);ctx.stroke();}
+
+    // ---- each system: orbits, planets, sun ----
+    for(const s of systems){
+      const R=sunR(s), lift=s.live;
+      // gravitational lean toward cursor when near
+      let lx=0,ly=0;
+      if(mouse.in){const dx=mouse.x-s.x,dy=mouse.y-s.y,d=Math.hypot(dx,dy);
+        if(d<R*4){const f=(1-d/(R*4))*8*lift;lx=dx/d*f;ly=dy/d*f;}}
+
+      // orbit rings
+      const rings=Math.max(...s.planets.map(p=>p.orbit),1);
+      ctx.globalCompositeOperation='lighter';
+      for(let k=1;k<=rings;k++){
+        const rr=R+ringGap(s)*k;
+        ctx.strokeStyle=`rgba(${s.rgb[0]},${s.rgb[1]},${s.rgb[2]},${0.06+lift*0.14})`;
+        ctx.lineWidth=1;ctx.beginPath();ctx.ellipse(s.x+lx,s.y+ly,rr,rr*0.9,0,0,7);ctx.stroke();
+      }
+      // planets
+      for(const p of s.planets){
+        if(!reduce)p.a+=p.speed*(1+lift*2.2)*0.016;
+        const rr=R+ringGap(s)*p.orbit;
+        const pxp=s.x+lx+Math.cos(p.a)*rr, pyp=s.y+ly+Math.sin(p.a)*rr*0.9;
+        const pr=p.pr*(1+lift*0.4);
+        const g=ctx.createRadialGradient(pxp,pyp,0,pxp,pyp,pr*3);
+        g.addColorStop(0,`rgba(${s.rgb[0]},${s.rgb[1]},${s.rgb[2]},${0.9})`);
+        g.addColorStop(1,'rgba(0,0,0,0)');
+        ctx.fillStyle=g;ctx.beginPath();ctx.arc(pxp,pyp,pr*3,0,7);ctx.fill();
+        ctx.fillStyle=`rgba(255,255,255,${0.7+lift*0.3})`;ctx.beginPath();ctx.arc(pxp,pyp,pr*0.8,0,7);ctx.fill();
+      }
+      // sun: layered glow + core + flare on ignite
+      const cx=s.x+lx*0.3, cy=s.y+ly*0.3;
+      const breathe=reduce?1:(1+0.04*Math.sin(t*1.4+s.seed));
+      const RR=R*breathe*(1+lift*0.14);
+      // corona
+      const cg=ctx.createRadialGradient(cx,cy,RR*0.2,cx,cy,RR*(1.9+lift*1.2));
+      cg.addColorStop(0,`rgba(${s.rgb[0]},${s.rgb[1]},${s.rgb[2]},${0.55+lift*0.4})`);
+      cg.addColorStop(0.5,`rgba(${s.rgb[0]},${s.rgb[1]},${s.rgb[2]},${0.18+lift*0.2})`);
+      cg.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle=cg;ctx.beginPath();ctx.arc(cx,cy,RR*(1.9+lift*1.2),0,7);ctx.fill();
+      // core disc
+      ctx.globalCompositeOperation='source-over';
+      const core=ctx.createRadialGradient(cx-RR*0.25,cy-RR*0.25,RR*0.1,cx,cy,RR);
+      core.addColorStop(0,'#ffffff');
+      core.addColorStop(0.35,`rgb(${Math.min(255,s.rgb[0]+80)},${Math.min(255,s.rgb[1]+70)},${Math.min(255,s.rgb[2]+70)})`);
+      core.addColorStop(1,`rgb(${s.rgb[0]},${s.rgb[1]},${s.rgb[2]})`);
+      ctx.fillStyle=core;ctx.beginPath();ctx.arc(cx,cy,RR,0,7);ctx.fill();
+      // ignition ring halo
+      if(lift>0.01){
+        ctx.strokeStyle=`rgba(${s.rgb[0]},${s.rgb[1]},${s.rgb[2]},${lift*0.6})`;
+        ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(cx,cy,RR*(1.5+lift*0.8),0,7);ctx.stroke();
+      }
+      // empty (Freelance=1) systems read dimmer
+      if(!s.count){ctx.globalAlpha=1;}
+      ctx.globalCompositeOperation='source-over';
+
+      // ease live toward target
+      const target=s.el.classList.contains('live')?1:0;
+      s.live+=(target-s.live)*0.12;
+      // reflect hue to the label via CSS var
+      if(s.el&&!s.el.style.getPropertyValue('--star-hue'))s.el.style.setProperty('--star-hue',s.hue);
+    }
+    ctx.globalCompositeOperation='source-over';ctx.globalAlpha=1;
+  }
+
+  function frame(now){
+    t=(now||0)/1000;
+    draw();
+    if(running&&!reduce)raf=requestAnimationFrame(frame);
+  }
+
+  // ---- pointer → nearest system ignites (proximity, feels alive) ----
+  function pick(mx,my){
+    let best=null,bd=1e9;
+    for(const s of systems){const d=Math.hypot(mx-s.x,my-s.y);if(d<bd){bd=d;best=s;}}
+    const R=best?sunR(best):0;
+    return (best&&bd<R*3.4)?best:null;
+  }
+  root.addEventListener('pointermove',e=>{
+    const r=root.getBoundingClientRect();mouse.x=e.clientX-r.left;mouse.y=e.clientY-r.top;mouse.in=true;
+    const hit=pick(mouse.x,mouse.y);
+    systems.forEach(s=>s.el.classList.toggle('live',s===hit));
+    root.style.cursor=hit?'pointer':'default';
+  });
+  root.addEventListener('pointerleave',()=>{mouse.in=false;systems.forEach(s=>s.el.classList.remove('live'));});
+  // keyboard focus also ignites
+  starEls.forEach((el,i)=>{
+    el.addEventListener('focus',()=>{systems.forEach(s=>s.el.classList.toggle('live',s.i===i));});
+    el.addEventListener('blur',()=>{if(!mouse.in)systems[i].el.classList.remove('live');});
+    // click → quick warp flash then let the link navigate
+    el.addEventListener('click',ev=>{
+      if(reduce)return; // plain navigation
+      ev.preventDefault();
+      const s=systems[i];let f=0;
+      (function warp(){f+=0.09;s.live=1+f*2;
+        if(f<1){requestAnimationFrame(warp);}else{location.href=el.getAttribute('href');}
+      })();
+    });
+  });
+
+  window.addEventListener('resize',()=>{clearTimeout(cv._t);cv._t=setTimeout(resize,150);});
+  document.addEventListener('visibilitychange',()=>{
+    running=!document.hidden;if(running&&!reduce){raf=requestAnimationFrame(frame);}else cancelAnimationFrame(raf);
+  });
+  resize();
+  if(reduce){frame(0);}else{raf=requestAnimationFrame(frame);}
 })();
 
 /* ===== HERO GRAPH ===== */
